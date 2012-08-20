@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<beans>
+
+<!--
+
+To use AD for authentication and authorization, include this file in WEB-INF.
+You also need to set the ldapAuthProvider to be the active authProvider in 
+applicationContext-acegi-security.xml. For example:
+	<bean id="authenticationManager"
+		class="org.acegisecurity.providers.ProviderManager">
+		<property name="providers">
+			<list>
+				<ref local="authProvider" />
+        ...
+
+And, your objectDefinitionSource must filter on the correct roles. Roles are 
+assigned from the groups the user is member of, converted to uppercase. For 
+example, if the user is member of the group Users, he will be assigned the
+role ROLE_USERS. The objectDefinitionSource must only allow access to /** for 
+users with the correct roles. This is an example:
+				CONVERT_URL_TO_LOWERCASE_BEFORE_COMPARISON
+				PATTERN_TYPE_APACHE_ANT
+				/login=IS_AUTHENTICATED_ANONYMOUSLY
+				/**=ROLE_GROUP1,ROLE_GROUP2
+-->
+
+
+    <bean id="initialDirContextFactory"
+        class="org.acegisecurity.ldap.DefaultInitialDirContextFactory">
+        <constructor-arg value="ldap://ad.example.com"/>
+        <property name="managerDn">
+            <value>CN=queryuser,DC=example,DC=com</value>
+        </property>
+        <property name="managerPassword">
+            <value>secret</value>
+        </property>
+    </bean>
+
+    <bean id="userSearch" class="org.acegisecurity.ldap.search.FilterBasedLdapUserSearch">
+        <constructor-arg index="0">
+            <value>OU=Users,DC=example,DC=com</value>
+        </constructor-arg>
+        <constructor-arg index="1">
+            <value>(mailNickname={0})</value>
+        </constructor-arg>
+        <constructor-arg index="2">
+            <ref local="initialDirContextFactory"/>
+        </constructor-arg>
+        <property name="searchSubtree">
+            <value>true</value>
+        </property>
+    </bean>
+
+    <bean id="ldapAuthProvider" class="org.acegisecurity.providers.ldap.LdapAuthenticationProvider">
+        <constructor-arg>
+            <bean class="org.acegisecurity.providers.ldap.authenticator.BindAuthenticator">
+                <constructor-arg>
+                    <ref local="initialDirContextFactory"/>
+                </constructor-arg>
+                <property name="userSearch" ref="userSearch"/>
+            </bean>
+        </constructor-arg>
+        <constructor-arg>
+            <bean class="org.acegisecurity.providers.ldap.populator.DefaultLdapAuthoritiesPopulator">
+                <constructor-arg>
+                    <ref local="initialDirContextFactory"/>
+                </constructor-arg>
+                <constructor-arg>
+                    <value>CN=Groups,DC=example,DC=com</value>
+                </constructor-arg>
+                <property name="groupRoleAttribute">
+                    <value>cn</value>
+                </property>
+            </bean>
+        </constructor-arg>
+    </bean>
+</beans>
